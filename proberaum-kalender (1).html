@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Proberaum-Kalender</title>
+<style>
+  :root{
+    --bg: #16151a;
+    --panel: #1e1c24;
+    --panel-2: #26232e;
+    --line: #34303c;
+    --amber: #e8a33d;
+    --amber-dim: #7a5a26;
+    --text: #ece8e2;
+    --text-dim: #9a94a3;
+    --red: #d8654f;
+    --green: #6fae6f;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--text);
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    min-height:100vh;
+    padding:0 0 60px 0;
+  }
+  .top{
+    padding:32px 20px 20px;
+    text-align:center;
+    border-bottom:1px solid var(--line);
+    background: linear-gradient(180deg, rgba(232,163,61,0.06), transparent 60%);
+  }
+  .eq{ display:flex; justify-content:center; gap:4px; margin-bottom:12px; }
+  .eq span{ width:4px; background:var(--amber); border-radius:2px; opacity:0.85; animation: bounce 1.6s ease-in-out infinite; }
+  .eq span:nth-child(1){height:10px; animation-delay:0s;}
+  .eq span:nth-child(2){height:22px; animation-delay:0.15s;}
+  .eq span:nth-child(3){height:14px; animation-delay:0.3s;}
+  .eq span:nth-child(4){height:26px; animation-delay:0.45s;}
+  .eq span:nth-child(5){height:12px; animation-delay:0.6s;}
+  @keyframes bounce{ 0%,100%{transform:scaleY(0.5);} 50%{transform:scaleY(1);} }
+  h1{ margin:0; font-size:1.6rem; letter-spacing:0.02em; font-weight:700; }
+  h1 span{color:var(--amber);}
+  .sub{ color:var(--text-dim); font-size:0.85rem; margin-top:6px; }
+  .status{
+    max-width:760px; margin:10px auto 0; padding:0 16px;
+    font-size:0.78rem; text-align:center; min-height:16px;
+  }
+  .status.err{ color:var(--red); }
+  .status.ok{ color:var(--green); }
+  .container{ max-width:760px; margin:0 auto; padding:20px 16px 0; }
+  .month-nav{
+    display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;
+  }
+  .month-nav button{
+    background:var(--panel-2); border:1px solid var(--line); color:var(--text);
+    font-size:1.1rem; width:38px; height:38px; border-radius:8px; cursor:pointer; transition:background 0.15s;
+  }
+  .month-nav button:hover{ background:var(--amber-dim); }
+  .month-label{ font-size:1.1rem; font-weight:600; text-transform:capitalize; }
+
+  .grid{
+    display:grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap:6px;
+  }
+  .wd{
+    text-align:center;
+    font-size:0.72rem;
+    color:var(--text-dim);
+    padding-bottom:4px;
+    font-weight:600;
+    letter-spacing:0.03em;
+  }
+  .day-cell{
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:9px;
+    min-height:68px;
+    padding:6px;
+    cursor:pointer;
+    transition:background 0.15s, border-color 0.15s;
+    display:flex;
+    flex-direction:column;
+    gap:4px;
+  }
+  .day-cell:hover{ background:var(--panel-2); }
+  .day-cell.outside{ opacity:0.32; }
+  .day-cell.today{ border-color:var(--amber); }
+  .day-cell.selected{ background:var(--amber-dim); border-color:var(--amber); }
+  .day-num{ font-size:0.82rem; font-weight:700; }
+  .day-tags{ display:flex; flex-direction:column; gap:2px; overflow:hidden; }
+  .day-tag{
+    font-size:0.62rem;
+    background:var(--panel-2);
+    color:var(--amber);
+    border-radius:4px;
+    padding:1px 4px;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+  .day-more{ font-size:0.6rem; color:var(--text-dim); }
+
+  .panel{
+    margin-top:18px;
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:12px;
+    padding:16px;
+    display:none;
+  }
+  .panel.open{ display:block; }
+  .panel-head{
+    display:flex; align-items:baseline; justify-content:space-between; margin-bottom:12px;
+  }
+  .panel-title{ font-weight:700; font-size:1rem; }
+  .panel-sub{ color:var(--text-dim); font-size:0.8rem; }
+  .close-btn{
+    background:none; border:none; color:var(--text-dim); font-size:1.1rem; cursor:pointer;
+  }
+  .close-btn:hover{ color:var(--text); }
+  .entries{ display:flex; flex-direction:column; gap:6px; margin-bottom:12px; }
+  .entry{
+    display:flex; align-items:center; justify-content:space-between;
+    background:var(--panel-2); border:1px solid var(--line); border-radius:7px; padding:8px 10px; font-size:0.88rem;
+  }
+  .entry-info b{ color:var(--amber); }
+  .entry-time{ color:var(--text-dim); margin-left:6px; }
+  .del-btn{ background:none; border:none; color:var(--text-dim); cursor:pointer; font-size:1rem; line-height:1; padding:2px 6px; }
+  .del-btn:hover{ color:var(--red); }
+  .add-form{ display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+  .add-form input[type="text"]{ flex:1 1 140px; min-width:120px; }
+  .add-form input{
+    background:var(--panel-2); border:1px solid var(--line); color:var(--text);
+    border-radius:7px; padding:8px 10px; font-size:0.88rem;
+  }
+  .add-form input[type="time"]{ width:105px; }
+  .add-form button{
+    background:var(--amber); border:none; color:#1a1710; font-weight:700;
+    border-radius:7px; padding:8px 16px; cursor:pointer; font-size:0.88rem; transition:filter 0.15s;
+  }
+  .add-form button:hover{ filter:brightness(1.1); }
+  .empty-hint{ color:var(--text-dim); font-size:0.84rem; font-style:italic; }
+  .footer-note{ text-align:center; color:var(--text-dim); font-size:0.74rem; margin-top:26px; }
+</style>
+</head>
+<body>
+
+<div class="top">
+  <div class="eq"><span></span><span></span><span></span><span></span><span></span></div>
+  <h1>Proberaum<span>kalender</span></h1>
+  <div class="sub">Wer probt wann? Auf einen Tag klicken und eintragen – kein Login nötig.</div>
+</div>
+<div class="status" id="status"></div>
+
+<div class="container">
+  <div class="month-nav">
+    <button id="prevBtn">‹</button>
+    <div class="month-label" id="monthLabel"></div>
+    <button id="nextBtn">›</button>
+  </div>
+
+  <div class="grid" id="weekdayRow"></div>
+  <div class="grid" id="calGrid" style="margin-top:6px;"></div>
+
+  <div class="panel" id="dayPanel">
+    <div class="panel-head">
+      <div>
+        <div class="panel-title" id="panelTitle"></div>
+        <div class="panel-sub" id="panelSub"></div>
+      </div>
+      <button class="close-btn" id="closePanel">✕</button>
+    </div>
+    <div class="entries" id="panelEntries"></div>
+    <div class="add-form">
+      <input type="text" placeholder="Name / Bandname" id="nameInput" maxlength="40">
+      <input type="time" value="18:00" id="startInput">
+      <input type="time" value="21:00" id="endInput">
+      <button id="addBtn">Eintragen</button>
+    </div>
+  </div>
+
+  <div class="footer-note">Alle Einträge sind für jeden mit diesem Link sichtbar und bearbeitbar.</div>
+</div>
+
+<script>
+const weekdayShort = ["Mo","Di","Mi","Do","Fr","Sa","So"];
+const monthNames = ["Januar","Februar","März","April","Mai","Juni","Juli","August","September","Oktober","November","Dezember"];
+
+let viewYear, viewMonth;
+const today = new Date();
+today.setHours(0,0,0,0);
+viewYear = today.getFullYear();
+viewMonth = today.getMonth();
+
+let selectedDate = null; // Date object
+let bookingsCache = {}; // ds -> array, cache for current month render
+
+function pad(n){ return n.toString().padStart(2,"0"); }
+function dateStr(d){ return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; }
+function fmtDMY(d){ return `${pad(d.getDate())}.${pad(d.getMonth()+1)}.${d.getFullYear()}`; }
+function sameDay(a,b){ return a.getFullYear()===b.getFullYear() && a.getMonth()===b.getMonth() && a.getDate()===b.getDate(); }
+
+function getMonday(d){
+  const date = new Date(d);
+  const day = date.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  date.setDate(date.getDate() + diff);
+  date.setHours(0,0,0,0);
+  return date;
+}
+
+function setStatus(msg, type){
+  const el = document.getElementById('status');
+  el.textContent = msg || '';
+  el.className = 'status' + (type ? ' '+type : '');
+  if(msg && type !== 'err'){
+    setTimeout(()=>{ if(el.textContent === msg) el.textContent=''; }, 2500);
+  }
+}
+
+async function storageGet(key){
+  try{
+    const res = await window.storage.get(key, true);
+    if(res && typeof res.value === 'string'){
+      return JSON.parse(res.value);
+    }
+    return [];
+  }catch(e){
+    // key not found throws -> treat as empty, but log real errors
+    return [];
+  }
+}
+
+async function storageSet(key, list){
+  const result = await window.storage.set(key, JSON.stringify(list), true);
+  if(!result){
+    throw new Error('Speichern fehlgeschlagen (kein Ergebnis von window.storage.set)');
+  }
+  return result;
+}
+
+function buildGridDays(){
+  const firstOfMonth = new Date(viewYear, viewMonth, 1);
+  const start = getMonday(firstOfMonth);
+  const days = [];
+  const cursor = new Date(start);
+  // always render 6 weeks (42 days) for a stable grid
+  for(let i=0;i<42;i++){
+    days.push(new Date(cursor));
+    cursor.setDate(cursor.getDate()+1);
+  }
+  return days;
+}
+
+function renderMonthLabel(){
+  document.getElementById('monthLabel').textContent = `${monthNames[viewMonth]} ${viewYear}`;
+}
+
+function renderWeekdayRow(){
+  document.getElementById('weekdayRow').innerHTML =
+    weekdayShort.map(w => `<div class="wd">${w}</div>`).join('');
+}
+
+async function renderCalendar(){
+  const days = buildGridDays();
+  const grid = document.getElementById('calGrid');
+  grid.innerHTML = days.map(d => {
+    const ds = dateStr(d);
+    const outside = d.getMonth() !== viewMonth;
+    const isToday = sameDay(d, today);
+    const isSelected = selectedDate && sameDay(d, selectedDate);
+    return `<div class="day-cell ${outside?'outside':''} ${isToday?'today':''} ${isSelected?'selected':''}" data-date="${ds}" id="cell-${ds}">
+      <div class="day-num">${d.getDate()}</div>
+      <div class="day-tags" id="tags-${ds}"></div>
+    </div>`;
+  }).join('');
+
+  grid.querySelectorAll('.day-cell').forEach(cell=>{
+    cell.addEventListener('click', ()=> selectDay(cell.getAttribute('data-date')));
+  });
+
+  // load entries for each day and fill tags (in parallel)
+  setStatus('Lade Einträge …');
+  try{
+    await Promise.all(days.map(async d=>{
+      const ds = dateStr(d);
+      const list = await storageGet('booking:'+ds);
+      bookingsCache[ds] = list;
+      const tagsEl = document.getElementById('tags-'+ds);
+      if(!tagsEl) return;
+      if(list.length === 0){ tagsEl.innerHTML=''; return; }
+      const shown = list.slice(0,2);
+      let html = shown.map(e => `<div class="day-tag">${escapeHtml(e.name)}</div>`).join('');
+      if(list.length > 2){
+        html += `<div class="day-more">+${list.length-2} mehr</div>`;
+      }
+      tagsEl.innerHTML = html;
+    }));
+    setStatus('');
+  }catch(e){
+    console.error(e);
+    setStatus('Fehler beim Laden der Einträge: ' + e.message, 'err');
+  }
+}
+
+function escapeHtml(str){
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+async function selectDay(ds){
+  const [y,m,day] = ds.split('-').map(Number);
+  selectedDate = new Date(y, m-1, day);
+
+  document.querySelectorAll('.day-cell').forEach(c=>c.classList.remove('selected'));
+  const cell = document.getElementById('cell-'+ds);
+  if(cell) cell.classList.add('selected');
+
+  const panel = document.getElementById('dayPanel');
+  panel.classList.add('open');
+  document.getElementById('panelTitle').textContent = weekdayShort[(selectedDate.getDay()+6)%7] === undefined ? '' : fullWeekdayName(selectedDate);
+  document.getElementById('panelSub').textContent = fmtDMY(selectedDate);
+
+  await renderPanelEntries(ds);
+  panel.scrollIntoView({behavior:'smooth', block:'nearest'});
+}
+
+function fullWeekdayName(d){
+  const names = ["Sonntag","Montag","Dienstag","Mittwoch","Donnerstag","Freitag","Samstag"];
+  return names[d.getDay()];
+}
+
+async function renderPanelEntries(ds){
+  const list = bookingsCache[ds] || await storageGet('booking:'+ds);
+  const entriesEl = document.getElementById('panelEntries');
+  entriesEl.innerHTML = list.length
+    ? list.map(e => `
+        <div class="entry">
+          <div class="entry-info"><b>${escapeHtml(e.name)}</b><span class="entry-time">${e.start}–${e.end} Uhr</span></div>
+          <button class="del-btn" data-id="${e.id}" title="Eintrag löschen">✕</button>
+        </div>`).join('')
+    : '<div class="empty-hint">Noch niemand eingetragen.</div>';
+
+  entriesEl.querySelectorAll('[data-id]').forEach(btn=>{
+    btn.addEventListener('click', ()=> deleteEntry(ds, btn.getAttribute('data-id')));
+  });
+}
+
+document.getElementById('closePanel').addEventListener('click', ()=>{
+  document.getElementById('dayPanel').classList.remove('open');
+  document.querySelectorAll('.day-cell').forEach(c=>c.classList.remove('selected'));
+  selectedDate = null;
+});
+
+document.getElementById('addBtn').addEventListener('click', async ()=>{
+  if(!selectedDate) return;
+  const ds = dateStr(selectedDate);
+  const nameInput = document.getElementById('nameInput');
+  const startInput = document.getElementById('startInput');
+  const endInput = document.getElementById('endInput');
+  const name = nameInput.value.trim();
+  const start = startInput.value;
+  const end = endInput.value;
+
+  if(!name){
+    nameInput.style.borderColor = 'var(--red)';
+    nameInput.focus();
+    return;
+  }
+  nameInput.style.borderColor = '';
+
+  const list = bookingsCache[ds] || await storageGet('booking:'+ds);
+  list.push({ id: Date.now().toString(36)+Math.random().toString(36).slice(2,6), name, start, end });
+  list.sort((a,b)=> a.start.localeCompare(b.start));
+
+  try{
+    setStatus('Speichere …');
+    await storageSet('booking:'+ds, list);
+    bookingsCache[ds] = list;
+    nameInput.value = '';
+    await renderPanelEntries(ds);
+    await refreshDayTags(ds);
+    setStatus('Gespeichert ✓', 'ok');
+  }catch(e){
+    console.error(e);
+    setStatus('Fehler beim Speichern: ' + e.message, 'err');
+  }
+});
+
+async function deleteEntry(ds, id){
+  const list = (bookingsCache[ds] || await storageGet('booking:'+ds)).filter(e => e.id !== id);
+  try{
+    setStatus('Speichere …');
+    await storageSet('booking:'+ds, list);
+    bookingsCache[ds] = list;
+    await renderPanelEntries(ds);
+    await refreshDayTags(ds);
+    setStatus('Gespeichert ✓', 'ok');
+  }catch(e){
+    console.error(e);
+    setStatus('Fehler beim Löschen: ' + e.message, 'err');
+  }
+}
+
+async function refreshDayTags(ds){
+  const list = bookingsCache[ds] || [];
+  const tagsEl = document.getElementById('tags-'+ds);
+  if(!tagsEl) return;
+  if(list.length === 0){ tagsEl.innerHTML=''; return; }
+  const shown = list.slice(0,2);
+  let html = shown.map(e => `<div class="day-tag">${escapeHtml(e.name)}</div>`).join('');
+  if(list.length > 2){
+    html += `<div class="day-more">+${list.length-2} mehr</div>`;
+  }
+  tagsEl.innerHTML = html;
+}
+
+document.getElementById('prevBtn').addEventListener('click', async ()=>{
+  viewMonth--;
+  if(viewMonth < 0){ viewMonth = 11; viewYear--; }
+  selectedDate = null;
+  document.getElementById('dayPanel').classList.remove('open');
+  renderMonthLabel();
+  await renderCalendar();
+});
+
+document.getElementById('nextBtn').addEventListener('click', async ()=>{
+  viewMonth++;
+  if(viewMonth > 11){ viewMonth = 0; viewYear++; }
+  selectedDate = null;
+  document.getElementById('dayPanel').classList.remove('open');
+  renderMonthLabel();
+  await renderCalendar();
+});
+
+// init
+if(!window.storage){
+  setStatus('Speicherfunktion in dieser Ansicht nicht verfügbar. Bitte im Claude-Artifact-Fenster öffnen.', 'err');
+}
+renderMonthLabel();
+renderWeekdayRow();
+renderCalendar();
+</script>
+
+</body>
+</html>
