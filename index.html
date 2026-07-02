@@ -136,7 +136,10 @@
     background:var(--panel-2); border:1px solid var(--line); color:var(--text);
     border-radius:7px; padding:8px 10px; font-size:0.88rem;
   }
-  .add-form input[type="time"]{ width:105px; }
+  .add-form select{
+    background:var(--panel-2); border:1px solid var(--line); color:var(--text);
+    border-radius:7px; padding:8px 10px; font-size:0.88rem; width:90px;
+  }
   .add-form button{
     background:var(--amber); border:none; color:#1a1710; font-weight:700;
     border-radius:7px; padding:8px 16px; cursor:pointer; font-size:0.88rem; transition:filter 0.15s;
@@ -176,8 +179,8 @@
     <div class="entries" id="panelEntries"></div>
     <div class="add-form">
       <input type="text" placeholder="Name / Bandname" id="nameInput" maxlength="40">
-      <input type="time" value="18:00" id="startInput">
-      <input type="time" value="21:00" id="endInput">
+      <select id="startInput"></select>
+      <select id="endInput"></select>
       <button id="addBtn">Eintragen</button>
     </div>
   </div>
@@ -221,20 +224,38 @@ function setStatus(msg, type){
   }
 }
 
+function waitForStorage(timeoutMs){
+  return new Promise((resolve, reject)=>{
+    const started = Date.now();
+    (function check(){
+      if(window.storage && typeof window.storage.get === 'function' && typeof window.storage.set === 'function'){
+        resolve();
+        return;
+      }
+      if(Date.now() - started > timeoutMs){
+        reject(new Error('Speicherfunktion (window.storage) wurde nicht bereitgestellt.'));
+        return;
+      }
+      setTimeout(check, 150);
+    })();
+  });
+}
+
 async function storageGet(key){
   try{
+    await waitForStorage(8000);
     const res = await window.storage.get(key, true);
     if(res && typeof res.value === 'string'){
       return JSON.parse(res.value);
     }
     return [];
   }catch(e){
-    // key not found throws -> treat as empty, but log real errors
     return [];
   }
 }
 
 async function storageSet(key, list){
+  await waitForStorage(8000);
   const result = await window.storage.set(key, JSON.stringify(list), true);
   if(!result){
     throw new Error('Speichern fehlgeschlagen (kein Ergebnis von window.storage.set)');
@@ -322,11 +343,29 @@ async function selectDay(ds){
 
   const panel = document.getElementById('dayPanel');
   panel.classList.add('open');
-  document.getElementById('panelTitle').textContent = weekdayShort[(selectedDate.getDay()+6)%7] === undefined ? '' : fullWeekdayName(selectedDate);
+  document.getElementById('panelTitle').textContent = fullWeekdayName(selectedDate);
   document.getElementById('panelSub').textContent = fmtDMY(selectedDate);
 
+  populateHourSelects();
   await renderPanelEntries(ds);
   panel.scrollIntoView({behavior:'smooth', block:'nearest'});
+}
+
+function populateHourSelects(){
+  const startSel = document.getElementById('startInput');
+  const endSel = document.getElementById('endInput');
+  let startOpts = '';
+  let endOpts = '';
+  for(let h=0; h<24; h++){
+    const label = pad(h)+':00';
+    startOpts += `<option value="${label}" ${h===18?'selected':''}>${label}</option>`;
+  }
+  for(let h=1; h<=24; h++){
+    const label = h===24 ? '24:00' : pad(h)+':00';
+    endOpts += `<option value="${label}" ${h===21?'selected':''}>${label}</option>`;
+  }
+  startSel.innerHTML = startOpts;
+  endSel.innerHTML = endOpts;
 }
 
 function fullWeekdayName(d){
@@ -438,12 +477,13 @@ document.getElementById('nextBtn').addEventListener('click', async ()=>{
 });
 
 // init
-if(!window.storage){
-  setStatus('Speicherfunktion in dieser Ansicht nicht verfügbar. Bitte im Claude-Artifact-Fenster öffnen.', 'err');
-}
 renderMonthLabel();
 renderWeekdayRow();
 renderCalendar();
+
+waitForStorage(8000).catch(()=>{
+  setStatus('Speicherfunktion in dieser Ansicht nicht verfügbar. Bitte im Claude-Artifact-Fenster öffnen.', 'err');
+});
 </script>
 
 </body>
